@@ -22,10 +22,17 @@
       {
         defaultPackage = naersk-lib.buildPackage {
           src = ./.;
-          buildInputs = [ 
-            pkgs.cmake
-            pkgs.fontconfig
-            pkgs.pkg-config
+          buildInputs = with pkgs; [ 
+            cmake
+            fontconfig
+            pkg-config
+            gnumake
+            xorg.libX11.dev
+            xorg.libXft
+            xorg.libXcursor
+            xorg.libXrandr
+            xorg.libXi
+            xorg.libXinerama
           ];
           RUST_LOG = "trace";
         };
@@ -40,6 +47,13 @@
             ])
             cmake 
             fontconfig
+            gnumake
+            xorg.libX11.dev
+            xorg.libXft
+            xorg.libXcursor
+            xorg.libXrandr
+            xorg.libXi
+            xorg.libXinerama
           ];
           RUST_SRC_PATH = rustPlatform.rustLibSrc;
           nativeBuildInputs = [pkgs.pkg-config];
