@@ -1,0 +1,12 @@
+[package]
+name = "graphics"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+env = "0.0.0"
+pretty_env_logger = "0.4.0"
+wgpu = { version = "0.15.0", features = ["naga", "glsl", "vulkan-portability", "trace", "spirv", "serde"] }
+winit = "0.27.5"
