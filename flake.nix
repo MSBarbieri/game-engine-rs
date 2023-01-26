@@ -3,19 +3,48 @@
     naersk.url = "github:nix-community/naersk/master";
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     utils.url = "github:numtide/flake-utils";
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
-
-  outputs = { self, nixpkgs, utils, naersk }:
+  outputs = { self, nixpkgs, utils, naersk, fenix }:
     utils.lib.eachDefaultSystem (system:
       let
-        pkgs = import nixpkgs { inherit system; };
+        pkgs = import nixpkgs { 
+          inherit system;
+          overlays = [
+            fenix.overlays.default 
+          ];
+        };
         naersk-lib = pkgs.callPackage naersk { };
       in
       {
-        defaultPackage = naersk-lib.buildPackage ./.;
+        defaultPackage = naersk-lib.buildPackage {
+          src = ./.;
+          buildInputs = [ 
+            pkgs.cmake
+            pkgs.fontconfig
+            pkgs.pkg-config
+          ];
+          RUST_LOG = "trace";
+        };
         devShell = with pkgs; mkShell {
-          buildInputs = [ cargo rustc rustfmt pre-commit rustPackages.clippy ];
+          buildInputs = [ 
+              (pkgs.fenix.complete.withComponents [
+              "cargo"
+              "clippy"
+              "rust-src"
+              "rustc"
+              "rustfmt"
+            ])
+            cmake 
+            fontconfig
+          ];
           RUST_SRC_PATH = rustPlatform.rustLibSrc;
+          nativeBuildInputs = [pkgs.pkg-config];
+          RUST_LOG = "debug";
+          # RUSTC_VERSION = pkgs.lib.readFile ./rust-toolchain;
         };
       });
 }
