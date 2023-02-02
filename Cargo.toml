@@ -1,15 +1,17 @@
-[package]
-name = "graphics"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+members = [
+  "desktop",
+  "web",
+  "core"
+]
+resolver="2"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
+[workspace.dependencies]
+core = { path = "../core/" }
 anyhow = "1.0.68"
 env = "0.0.0"
 log = "0.4.17"
 pretty_env_logger = "0.4.0"
 serde = { version = "1.0.152", features = ["derive"] }
-wgpu = { version = "0.15.0", features = ["naga", "glsl", "vulkan-portability", "trace", "spirv", "serde"] }
 winit = { version = "0.27.5" }
+wgpu = { version = "0.15.0", features = ["naga", "glsl", "trace", "spirv", "serde"] }

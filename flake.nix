@@ -18,6 +18,16 @@
           ];
         };
         naersk-lib = pkgs.callPackage naersk { };
+
+        desktop-command = pkgs.writeShellScriptBin "desktop" ''
+          #!/bin/bash
+          cargo run --bin desktop
+        '';
+
+        web-command = pkgs.writeShellScriptBin "desktop" ''
+          #!/bin/bash
+          cargo run --bin web
+        '';
       in
       {
         defaultPackage = naersk-lib.buildPackage {
@@ -54,10 +64,16 @@
             xorg.libXrandr
             xorg.libXi
             xorg.libXinerama
+            desktop-command
+            web-command
+            vulkan-headers
+            vulkan-loader
+            vulkan-tools
           ];
           RUST_SRC_PATH = rustPlatform.rustLibSrc;
           nativeBuildInputs = [pkgs.pkg-config];
           RUST_LOG = "debug";
+          LD_LIBRARY_PATH="${vulkan-loader}/lib";
           # RUSTC_VERSION = pkgs.lib.readFile ./rust-toolchain;
         };
       });
