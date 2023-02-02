@@ -1,0 +1,17 @@
+[package]
+name = "core"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+wgpu = { version = "0.15.0", features = ["naga", "glsl", "trace", "spirv", "serde"] }
+anyhow = "1.0.68"
+env = "0.0.0"
+log = "0.4.17"
+pretty_env_logger = "0.4.0"
+serde = { version = "1.0.152", features = ["derive"] }
+winit = { version = "0.27.5" }
+bytemuck = { version = "1.13.0", features = ["derive"] }
+image = { version = "0.24.5", features = ["png", "jpeg"] }
