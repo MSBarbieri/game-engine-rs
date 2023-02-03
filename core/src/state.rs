@@ -1,11 +1,11 @@
 use anyhow::Result;
-use image::GenericImageView;
-use log::debug;
+use cgmath::prelude::*;
 use wgpu::util::DeviceExt;
 use winit::{event::WindowEvent, window::Window};
 
 use crate::{
     camera::{Camera, CameraUniform},
+    instance::{Instance, InstanceRaw},
     texture::Texture,
     vertex::Vertex,
     INDICES, VERTICES,
@@ -14,20 +14,29 @@ pub struct State {
     pub surface: wgpu::Surface,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
-    config: wgpu::SurfaceConfiguration,
+    pub config: wgpu::SurfaceConfiguration,
     pub size: winit::dpi::PhysicalSize<u32>,
-    render_pipeline: wgpu::RenderPipeline,
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
-    num_indices: u32,
-    diffuse_bind_group: wgpu::BindGroup,
-    diffuse_texture: Texture,
-    camera: Camera,
-    camera_uniform: CameraUniform,
-    camera_buffer: wgpu::Buffer,
-    camera_bind_group: wgpu::BindGroup,
-    window: Window,
+    pub render_pipeline: wgpu::RenderPipeline,
+    pub vertex_buffer: wgpu::Buffer,
+    pub index_buffer: wgpu::Buffer,
+    pub num_indices: u32,
+    pub diffuse_bind_group: wgpu::BindGroup,
+    pub diffuse_texture: Texture,
+    pub camera: Camera,
+    pub camera_uniform: CameraUniform,
+    pub camera_buffer: wgpu::Buffer,
+    pub camera_bind_group: wgpu::BindGroup,
+    pub instances: Vec<Instance>,
+    pub instance_buffer: wgpu::Buffer,
+    pub window: Window,
 }
+
+const NUM_INSTANCES_PER_ROW: u32 = 10;
+const INSTANCE_DISPLACEMENT: cgmath::Vector3<f32> = cgmath::Vector3::new(
+    NUM_INSTANCES_PER_ROW as f32 * 0.5,
+    0.0,
+    NUM_INSTANCES_PER_ROW as f32 * 0.5,
+);
 
 impl State {
     // Creating some of the wgpu types requires async code
@@ -83,7 +92,7 @@ impl State {
 
         // load image and store into Vec<RGBA>.
         let diffuse_bytes = include_bytes!("happy-tree.png");
-        let mut diffuse_texture =
+        let diffuse_texture =
             crate::texture::Texture::from_bytes(&device, &queue, diffuse_bytes, "happy-tree.png")?;
 
         let texture_bind_group_layout =
@@ -167,6 +176,41 @@ impl State {
             }],
         });
 
+        let instances = (0..NUM_INSTANCES_PER_ROW)
+            .flat_map(|z| {
+                (0..NUM_INSTANCES_PER_ROW).map(move |x| {
+                    let position = cgmath::Vector3 {
+                        x: x as f32,
+                        y: 0.0,
+                        z: z as f32,
+                    } - INSTANCE_DISPLACEMENT;
+
+                    let rotation = if position.is_zero() {
+                        // this is needed so an object at (0, 0, 0) won't get scaled to zero
+                        // as Quaternions can effect scale if they're not created correctly
+                        cgmath::Quaternion::from_axis_angle(
+                            cgmath::Vector3::unit_z(),
+                            cgmath::Deg(0.0),
+                        )
+                    } else {
+                        cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
+                    };
+
+                    Instance { position, rotation }
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let instance_data = instances
+            .iter()
+            .map(|f| (*f).into())
+            .collect::<Vec<InstanceRaw>>();
+        let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Instance Buffer"),
+            contents: bytemuck::cast_slice(&instance_data),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
         let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
 
         let render_pipeline_layout =
@@ -182,7 +226,7 @@ impl State {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[Vertex::desc()],
+                buffers: &[Vertex::desc(), InstanceRaw::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -241,6 +285,8 @@ impl State {
             camera_uniform,
             camera_buffer,
             camera_bind_group,
+            instances,
+            instance_buffer,
         })
     }
 
@@ -260,13 +306,13 @@ impl State {
     pub fn input(&mut self, event: &WindowEvent) -> bool {
         match event {
             WindowEvent::KeyboardInput {
-                device_id,
-                input,
-                is_synthetic,
+                device_id: _,
+                input: _,
+                is_synthetic: _,
             } => (),
-            WindowEvent::CursorEntered { device_id } => (),
-            WindowEvent::CursorLeft { device_id } => (),
-            WindowEvent::ModifiersChanged(state) => (),
+            WindowEvent::CursorEntered { device_id: _ } => (),
+            WindowEvent::CursorLeft { device_id: _ } => (),
+            WindowEvent::ModifiersChanged(_state) => (),
             _ => (),
         }
         false
@@ -317,8 +363,10 @@ impl State {
             render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
             render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+
+            render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+            render_pass.draw_indexed(0..self.num_indices, 0, 0..self.instances.len() as _);
         }
 
         // submit will accept anything that implements IntoIter

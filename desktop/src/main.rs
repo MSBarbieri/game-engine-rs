@@ -1,16 +1,12 @@
 #[macro_use]
 extern crate log;
 
-use core::vertex::Vertex;
-
 use anyhow::Result;
 use winit::{
-    event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent},
+    event::WindowEvent,
     event_loop::{ControlFlow, EventLoop},
-    window::{Window, WindowBuilder},
+    window::WindowBuilder,
 };
-
-fn window_hander(_window: &mut Window, event: WindowEvent, control_flow: &mut ControlFlow) {}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -21,8 +17,6 @@ async fn main() -> Result<()> {
     let window = WindowBuilder::new().build(&event_loop)?;
     let mut state = core::State::new(window).await?;
     let _window_id = state.window().id();
-
-    let mut buffer = Vertex::create_buffer(&mut state, core::VERTICES);
 
     event_loop.run(move |event, _something, control_flow| match event {
         winit::event::Event::RedrawRequested(window_id) if window_id == _window_id => {
