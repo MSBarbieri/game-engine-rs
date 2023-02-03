@@ -6,11 +6,12 @@ use winit::{event::WindowEvent, window::Window};
 use crate::{
     camera::{Camera, CameraUniform},
     instance::{Instance, InstanceRaw},
-    texture::Texture,
+    texture::{self, DepthTexture, Texture},
     vertex::Vertex,
     INDICES, VERTICES,
 };
 pub struct State {
+    pub window: Window,
     pub surface: wgpu::Surface,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
@@ -28,7 +29,7 @@ pub struct State {
     pub camera_bind_group: wgpu::BindGroup,
     pub instances: Vec<Instance>,
     pub instance_buffer: wgpu::Buffer,
-    pub window: Window,
+    pub depth_texture: Texture,
 }
 
 const NUM_INSTANCES_PER_ROW: u32 = 10;
@@ -212,6 +213,8 @@ impl State {
         });
 
         let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
+        let depth_texture =
+            texture::Texture::create_depth_texture(&device, &config, "depth_texture");
 
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -246,7 +249,13 @@ impl State {
                 polygon_mode: wgpu::PolygonMode::Fill,
                 conservative: false,
             },
-            depth_stencil: None,
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: texture::Texture::DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
             multisample: wgpu::MultisampleState {
                 count: 1,
                 mask: !0,
@@ -287,6 +296,7 @@ impl State {
             camera_bind_group,
             instances,
             instance_buffer,
+            depth_texture,
         })
     }
 
@@ -301,6 +311,8 @@ impl State {
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
         }
+        self.depth_texture =
+            texture::Texture::create_depth_texture(&self.device, &self.config, "depth_texture");
     }
 
     pub fn input(&mut self, event: &WindowEvent) -> bool {
@@ -356,7 +368,14 @@ impl State {
                         store: true,
                     },
                 })],
-                depth_stencil_attachment: None,
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_texture.view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: true,
+                    }),
+                    stencil_ops: None,
+                }),
             });
 
             render_pass.set_pipeline(&self.render_pipeline);
